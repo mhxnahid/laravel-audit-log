@@ -45,15 +45,14 @@ php artisan migrate
 php artisan vendor:publish --tag="audit-log"
 ```
 
-This copies three things:
+This copies two things:
 
 | Source | Destination |
 |---|---|
 | `config/audit-log.php` | `config/audit-log.php` |
 | `resources/views/` | `resources/views/vendor/audit-log/` |
-| `resources/js/ActivityLogs.vue` | `resources/js/vendor/audit-log/ActivityLogs.vue` |
 
-You only need to publish if you want to customise views, the Vue component, or the config file. The package works out of the box without publishing.
+You only need to publish if you want to customise views or the config file. The package works out of the box without publishing.
 
 ---
 
@@ -75,7 +74,7 @@ return [
 
     // URL prefix for the viewer routes.
     // Changing this also renames the named routes `audit-log.index` and `audit-log.data`.
-    'route_prefix' => 'activity-logs',
+    'route_prefix' => 'mxn/audit-logs',
 
     // Eloquent model used to populate the "User" filter dropdown.
     // The model must have `id` and `name` columns.
@@ -227,8 +226,8 @@ The package registers two routes automatically:
 
 | Route | Named route | Description |
 |---|---|---|
-| `GET /activity-logs` | `audit-log.index` | Viewer page |
-| `GET /activity-logs/data` | `audit-log.data` | JSON data endpoint for the table |
+| `GET /mxn/audit-logs` | `audit-log.index` | Viewer page |
+| `GET /mxn/audit-logs/data` | `audit-log.data` | JSON data endpoint for the table |
 
 Both routes are protected by `auth` and `can:{gate}` middleware. The gate defaults to `ACTIVITY_LOGS_ALL`; change it via `AUDIT_LOG_GATE` in your `.env` or in the published config.
 
