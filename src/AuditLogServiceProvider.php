@@ -31,8 +31,6 @@ class AuditLogServiceProvider extends ServiceProvider
                 => config_path('audit-log.php'),
             __DIR__ . '/../resources/views'
                 => resource_path('views/vendor/audit-log'),
-            __DIR__ . '/../resources/js/ActivityLogs.vue'
-                => resource_path('js/vendor/audit-log/ActivityLogs.vue'),
         ], 'audit-log');
     }
 }
