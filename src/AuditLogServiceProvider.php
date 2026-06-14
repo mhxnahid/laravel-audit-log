@@ -14,11 +14,15 @@ class AuditLogServiceProvider extends ServiceProvider
 
         $this->app->singleton(ActivityLogService::class);
 
-        // Bind the default registry. Host apps can override this binding in
-        // their own service provider to supply a hand-crafted registry with
-        // a fixed list of log names / events / subject types instead of the
-        // live database query that ActivityTypeRegistry performs.
-        $this->app->bindIf(ActivityTypeRegistryContract::class, ActivityTypeRegistry::class);
+        // Bind the registry named in config('audit-log.registry'), defaulting
+        // to the live-database ActivityTypeRegistry. Host apps point this at an
+        // AbstractActivityTypeRegistry subclass to serve filter options from a
+        // fixed vocabulary instead. bindIf so an explicit container binding in
+        // the host app still takes precedence.
+        $this->app->bindIf(
+            ActivityTypeRegistryContract::class,
+            fn () => $this->app->make(config('audit-log.registry', ActivityTypeRegistry::class))
+        );
     }
 
     public function boot(): void

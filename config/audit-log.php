@@ -29,6 +29,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Activity type registry
+    |--------------------------------------------------------------------------
+    | The class that supplies the viewer's filter dropdown options (log names,
+    | events, subject types). Must implement
+    | Mxnwire\AuditLog\Contracts\ActivityTypeRegistryContract.
+    |
+    | Defaults to the DB-backed registry, which `SELECT DISTINCT`s the live
+    | activity_log table. To derive the options from a fixed vocabulary instead,
+    | point this at an Mxnwire\AuditLog\AbstractActivityTypeRegistry subclass:
+    |   'registry' => \App\Activity\ActivityType::class,
+    */
+    'registry' => \Mxnwire\AuditLog\ActivityTypeRegistry::class,
+
+    /*
+    |--------------------------------------------------------------------------
     | Route prefix
     |--------------------------------------------------------------------------
     | URL prefix for the viewer routes. Changing this also changes the named
