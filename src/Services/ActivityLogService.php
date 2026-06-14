@@ -72,7 +72,7 @@ class ActivityLogService
         $resolver = config('audit-log.role_resolver');
         $role     = $resolver
             ? $resolver($user)
-            : ($user ? ($user->role ?? $user->urole ?? null) : null);
+            : ($user ? ($user->role ?? null) : null);
 
         $context = [
             '__actor' => [

@@ -4,24 +4,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Permission gate
+    | Access gate
     |--------------------------------------------------------------------------
-    | The ability string used in the route middleware `can:X` guard. Must be a
-    | permission defined in your host app (e.g. via spatie/laravel-permission).
+    | A callable that decides whether the current request may view the audit
+    | logs. It receives the authenticated user (or null) and must return a
+    | boolean. Return true to allow access, false to deny (403).
+    |
+    | Example (after vendor:publish):
+    |   'gate' => fn ($user) => $user?->can('ACTIVITY_LOGS_ALL') ?? false,
     */
-    'gate' => env('AUDIT_LOG_GATE', 'ACTIVITY_LOGS_ALL'),
+    'gate' => fn ($user) => $user?->role === 'admin',
 
     /*
     |--------------------------------------------------------------------------
     | Role resolver
     |--------------------------------------------------------------------------
     | A callable that returns the actor's role label from a User model instance.
-    | null = falls back to ->role ?? ->urole ?? null.
+    | Receives the authenticated user (or null) and returns a string or null.
     |
     | Example (after vendor:publish):
-    |   'role_resolver' => fn ($user) => $user->urole ?? null,
+    |   'role_resolver' => fn ($user) => $user?->roles->first()?->name,
     */
-    'role_resolver' => null,
+    'role_resolver' => fn ($user) => $user?->role ?? null,
 
     /*
     |--------------------------------------------------------------------------

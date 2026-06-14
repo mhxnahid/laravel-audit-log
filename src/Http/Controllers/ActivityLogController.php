@@ -12,7 +12,7 @@ use Spatie\Activitylog\Models\Activity;
  *
  * index() renders the Blade shell that mounts the <activity-logs> Vue component
  * and injects the filter option lists; data() is the JSON endpoint the component
- * paginates. Both are gated by the permission in config('audit-log.gate').
+ * paginates. Both are gated by the callable in config('audit-log.gate').
  */
 class ActivityLogController extends Controller
 {

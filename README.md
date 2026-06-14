@@ -63,14 +63,14 @@ After publishing, edit `config/audit-log.php`:
 ```php
 return [
 
-    // The ability string checked by the route middleware `can:X`.
-    // Must be a permission defined in your host app (e.g. via spatie/laravel-permission).
-    // Can also be set via the AUDIT_LOG_GATE environment variable.
-    'gate' => env('AUDIT_LOG_GATE', 'ACTIVITY_LOGS_ALL'),
+    // A callable that decides whether the current request may view the logs.
+    // It receives the authenticated user (or null) and must return a boolean.
+    // Defaults to admins only; e.g. fn ($user) => $user?->can('ACTIVITY_LOGS_ALL') ?? false,
+    'gate' => fn ($user) => $user?->role === 'admin',
 
     // A callable that resolves the actor's role label from a User model instance.
-    // null = falls back to $user->role ?? $user->urole ?? null.
-    'role_resolver' => null,
+    // Receives the authenticated user (or null) and returns a string or null.
+    'role_resolver' => fn ($user) => $user?->role ?? null,
 
     // URL prefix for the viewer routes.
     // Changing this also renames the named routes `audit-log.index` and `audit-log.data`.
@@ -88,12 +88,6 @@ return [
 
 ];
 ```
-
-### Environment variable
-
-| Variable | Default | Description |
-|---|---|---|
-| `AUDIT_LOG_GATE` | `ACTIVITY_LOGS_ALL` | Permission gate for the viewer routes |
 
 ---
 
@@ -229,7 +223,7 @@ The package registers two routes automatically:
 | `GET /mxn/audit-logs` | `audit-log.index` | Viewer page |
 | `GET /mxn/audit-logs/data` | `audit-log.data` | JSON data endpoint for the table |
 
-Both routes are protected by `auth` and `can:{gate}` middleware. The gate defaults to `ACTIVITY_LOGS_ALL`; change it via `AUDIT_LOG_GATE` in your `.env` or in the published config.
+Both routes are protected by `auth` plus a gate callback. The `gate` config is a closure receiving the authenticated user and returning a boolean; it allows only users whose `role` is `admin` by default. Override it in the published config — e.g. `fn ($user) => $user?->can('ACTIVITY_LOGS_ALL') ?? false`.
 
 ---
 
