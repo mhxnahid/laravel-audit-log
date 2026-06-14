@@ -1,12 +1,12 @@
 # mxnwire/laravel-audit-log
 
-Activity log viewer and logger layered on top of [spatie/laravel-activitylog](https://github.com/spatie/laravel-activitylog).
+Audit log viewer and logger layered on top of [spatie/laravel-activitylog](https://github.com/spatie/laravel-activitylog).
 
 Spatie owns the storage (`activity_log` table, polymorphic causer/subject, and the `activitylog:clean` prune command). This package adds:
 
-- A `activity_log()` helper and `ActivityLogService` that freeze actor identity and request context at write time.
+- An `audit_log()` helper and `AuditLogService` that freeze actor identity and request context at write time.
 - A built-in viewer UI (filterable table, no JS build step required) protected by a permission gate.
-- `ActivityMetadata` / `Change` value objects for structured before/after diffs in the `properties` column.
+- `AuditMetadata` / `Change` value objects for structured before/after diffs in the `properties` column.
 
 ---
 
@@ -65,7 +65,7 @@ return [
 
     // A callable that decides whether the current request may view the logs.
     // It receives the authenticated user (or null) and must return a boolean.
-    // Defaults to admins only; e.g. fn ($user) => $user?->can('ACTIVITY_LOGS_ALL') ?? false,
+    // Defaults to admins only; e.g. fn ($user) => $user?->can('AUDIT_LOGS_ALL') ?? false,
     'gate' => fn ($user) => $user?->role === 'admin',
 
     // A callable that resolves the actor's role label from a User model instance.
@@ -81,6 +81,11 @@ return [
     // Set to null to hide the user filter entirely.
     'user_model' => 'App\\Models\\User',
 
+    // Attributes of the causer (actor) exposed in the viewer's JSON response.
+    // Only these keys survive serialization (the model's own `$hidden` still
+    // applies first). Set to null to return the full causer model.
+    'causer_attributes' => ['id', 'name', 'email'],
+
     // Blade layout the viewer page extends.
     // Override to wrap the viewer inside your own app shell.
     // The layout must @yield('content') and @yield('script').
@@ -93,22 +98,24 @@ return [
 
 ## Usage
 
-### Logging an activity
+### Logging an audit event
 
 Use the global helper (available automatically — no import needed):
 
 ```php
-activity_log('user.login');
+audit_log('user.login');
 ```
+
+> **Renamed in 2.0.** The helper is now `audit_log()` and the service is `AuditLogService`. The old `activity_log()` helper is kept as a deprecated forwarding alias and will be removed in a future release — migrate calls to `audit_log()`.
 
 Or inject the service directly:
 
 ```php
-use Mxnwire\AuditLog\Services\ActivityLogService;
+use Mxnwire\AuditLog\Services\AuditLogService;
 
 class AuthController extends Controller
 {
-    public function __construct(private ActivityLogService $auditLog) {}
+    public function __construct(private AuditLogService $auditLog) {}
 
     public function login(Request $request)
     {
@@ -121,10 +128,10 @@ class AuthController extends Controller
 #### Signature
 
 ```php
-activity_log(
+audit_log(
     string $action,                      // dotted verb, e.g. 'broadsheet.viewed'
     ?Model $subject = null,              // the record acted on
-    ?ActivityMetadata $metadata = null,  // structured diff / extra fields
+    ?AuditMetadata $metadata = null,  // structured diff / extra fields
     ?string $description = null          // optional human-readable label
 ): void
 ```
@@ -139,43 +146,113 @@ The dotted action maps to spatie's two indexable columns:
                          event    = null
 ```
 
-The `__actor` and `__request` context is always merged into spatie's `properties` JSON column automatically:
+The `__actor` and `__request` context is merged into spatie's `properties` JSON column automatically. `__actor` is the actor snapshot; `__request` is built from the `request_context` config (see below):
 
 ```json
 {
   "__actor":   { "name": "Jane Smith", "role": "admin" },
-  "__request": { "method": "POST", "route": "posts.store", "url": "...", "ip": "...", "user_agent": "..." }
+  "__request": {
+    "method": "POST", "route": "posts.store", "url": "...", "ip": "...", "user_agent": "...",
+    "query": { "page": "2" },
+    "headers": { "request_id": "...", "correlation_id": "..." }
+  }
 }
+```
+
+#### Configuring `__request`
+
+The `request_context` array in `config/audit-log.php` is the single source of
+truth for what lands in `__request`. List the built-in properties you want by
+name — the package ships resolvers for `method`, `route`, `url`, `ip`,
+`user_agent`, `query`, and `body`. `query` is enabled by default; `body` is not,
+since it can carry secrets. To capture anything else, add a keyed entry with your
+own `fn ($request) => mixed` resolver (this also overrides a built-in of the same
+name). Header-sourced values go under the `headers` group, mapping a property
+name to the inbound header:
+
+```php
+'request_context' => [
+    // Enable built-ins by name:
+    'method',
+    'route',
+    'url',
+    'ip',
+    'user_agent',
+    'query',
+    // 'body',   // off by default — enable to log request input
+
+    // Add your own, resolved from anywhere (or override a built-in by name):
+    'tenant_id'  => fn ($request) => $request->header('X-Tenant') ?? optional(tenant())->id,
+    'user_agent' => fn ($request) => substr((string) $request->userAgent(), 0, 200),
+
+    // Header-sourced values go under the `headers` group:
+    'headers' => [
+        'request_id'     => 'X-Request-Id',
+        'correlation_id' => 'X-Correlation-Id',
+    ],
+],
+```
+
+Resolved values land in `__request` (header values under `__request.headers`); a
+null/empty result is dropped, so a request without a given header — or an empty
+query string — simply omits that property.
+
+##### Redacting secrets
+
+Logged `query` and `body` input is filtered through the `redact` list before
+storage, so credentials never reach the log. Matching is case-insensitive and
+recurses into nested arrays; a matched value becomes `"[REDACTED]"`. The defaults
+cover common credential fields (`password`, `token`, `secret`, …) — edit the list
+to fit your app:
+
+```php
+'redact' => [
+    'password',
+    'password_confirmation',
+    'token',
+    'secret',
+    // …
+],
+```
+
+To set a value manually (overriding the configured source), pass a field of the
+same name in the metadata bag — the explicit value always wins and is stored only
+under `__request`:
+
+```php
+audit_log('order.placed', $order, AuditMetadata::make([
+    'request_id' => $myTraceId,
+]));
 ```
 
 ---
 
 ### Adding structured metadata
 
-Use `ActivityMetadata` to attach typed field-level detail to a log entry.
+Use `AuditMetadata` to attach typed field-level detail to a log entry.
 
 **Arbitrary fields:**
 
 ```php
-use Mxnwire\AuditLog\Activity\Metadata\ActivityMetadata;
+use Mxnwire\AuditLog\Audit\Metadata\AuditMetadata;
 
-activity_log(
+audit_log(
     'user.login',
     subject: $user,
-    metadata: ActivityMetadata::make(['via' => 'password'])
+    metadata: AuditMetadata::make(['via' => 'password'])
 );
 ```
 
 **Before/after diff for a specific field:**
 
 ```php
-use Mxnwire\AuditLog\Activity\Metadata\ActivityMetadata;
-use Mxnwire\AuditLog\Activity\Metadata\Change;
+use Mxnwire\AuditLog\Audit\Metadata\AuditMetadata;
+use Mxnwire\AuditLog\Audit\Metadata\Change;
 
-activity_log(
+audit_log(
     'subscription.updated',
     subject: $subscription,
-    metadata: ActivityMetadata::make([
+    metadata: AuditMetadata::make([
         'level' => Change::make($old->level, $new->level),
     ])
 );
@@ -190,24 +267,24 @@ Stored in `properties` as:
 **Auto-diff two arrays (keeps only changed keys):**
 
 ```php
-$metadata = ActivityMetadata::diff(
+$metadata = AuditMetadata::diff(
     $record->getOriginal(),  // before
     $record->getAttributes() // after
 );
 
-activity_log('post.updated', subject: $record, metadata: $metadata);
+audit_log('post.updated', subject: $record, metadata: $metadata);
 ```
 
 You can restrict which keys are diffed with the optional third argument:
 
 ```php
-ActivityMetadata::diff($before, $after, keys: ['title', 'status', 'published_at']);
+AuditMetadata::diff($before, $after, keys: ['title', 'status', 'published_at']);
 ```
 
 **Fluent chaining:**
 
 ```php
-ActivityMetadata::diff($before, $after)
+AuditMetadata::diff($before, $after)
     ->with('trigger', 'bulk-import')
     ->with('row_count', 500);
 ```
@@ -223,7 +300,7 @@ The package registers two routes automatically:
 | `GET /mxn/audit-logs` | `audit-log.index` | Viewer page |
 | `GET /mxn/audit-logs/data` | `audit-log.data` | JSON data endpoint for the table |
 
-Both routes are protected by `auth` plus a gate callback. The `gate` config is a closure receiving the authenticated user and returning a boolean; it allows only users whose `role` is `admin` by default. Override it in the published config — e.g. `fn ($user) => $user?->can('ACTIVITY_LOGS_ALL') ?? false`.
+Both routes are protected by `auth` plus a gate callback. The `gate` config is a closure receiving the authenticated user and returning a boolean; it allows only users whose `role` is `admin` by default. Override it in the published config — e.g. `fn ($user) => $user?->can('AUDIT_LOGS_ALL') ?? false`.
 
 ---
 
@@ -260,14 +337,14 @@ If your app does not use a `role` or `urole` attribute directly on the User mode
 'role_resolver' => fn ($user) => $user->roles->first()?->name,
 ```
 
-### Custom activity type registry
+### Custom audit type registry
 
-The package resolves filter options (log names, events, subject types) from the `activity_log` table at runtime via `ActivityTypeRegistry`. To provide a static list instead — or to customise the queries — bind your own implementation in a service provider:
+The package resolves filter options (log names, events, subject types) from the `activity_log` table at runtime via `AuditTypeRegistry`. To provide a static list instead — or to customise the queries — bind your own implementation in a service provider:
 
 ```php
-use Mxnwire\AuditLog\Contracts\ActivityTypeRegistryContract;
+use Mxnwire\AuditLog\Contracts\AuditTypeRegistryContract;
 
-$this->app->bind(ActivityTypeRegistryContract::class, MyCustomRegistry::class);
+$this->app->bind(AuditTypeRegistryContract::class, MyCustomRegistry::class);
 ```
 
 Your class must implement `logNames(): array`, `events(): array`, and `subjectTypes(): array`.
@@ -308,9 +385,9 @@ Or call PHPUnit directly:
 **4. Run a single test file:**
 
 ```bash
-./vendor/bin/phpunit tests/Unit/ActivityMetadataTest.php
+./vendor/bin/phpunit tests/Unit/AuditMetadataTest.php
 ./vendor/bin/phpunit tests/Unit/ChangeTest.php
-./vendor/bin/phpunit tests/Feature/ActivityLogServiceTest.php
+./vendor/bin/phpunit tests/Feature/AuditLogServiceTest.php
 ```
 
 **5. Run a single test by name:**
@@ -323,9 +400,9 @@ Or call PHPUnit directly:
 
 | Path | What it covers |
 |---|---|
-| `tests/Unit/ActivityMetadataTest.php` | `ActivityMetadata` value object — make, diff, with |
+| `tests/Unit/AuditMetadataTest.php` | `AuditMetadata` value object — make, diff, with |
 | `tests/Unit/ChangeTest.php` | `Change` value object — serialisation |
-| `tests/Feature/ActivityLogServiceTest.php` | `ActivityLogService` end-to-end against a real SQLite DB |
+| `tests/Feature/AuditLogServiceTest.php` | `AuditLogService` end-to-end against a real SQLite DB |
 | `tests/TestCase.php` | Base case — boots Testbench, runs spatie migrations in-memory |
 
 ---

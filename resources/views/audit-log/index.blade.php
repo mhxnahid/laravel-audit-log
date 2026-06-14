@@ -6,7 +6,7 @@
 
 @section('script')
     <script>
-        window.activityLogFilters = @json($filters);
+        window.auditLogFilters = @json($filters);
         window.auditLogDataUrl    = '{{ route("audit-log.data") }}';
     </script>
 @endsection

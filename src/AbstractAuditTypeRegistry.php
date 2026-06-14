@@ -2,10 +2,10 @@
 
 namespace Mxnwire\AuditLog;
 
-use Mxnwire\AuditLog\Contracts\ActivityTypeRegistryContract;
+use Mxnwire\AuditLog\Contracts\AuditTypeRegistryContract;
 
 /**
- * Vocabulary-backed activity-type registry.
+ * Vocabulary-backed audit-type registry.
  *
  * Extend this in the host app, declare your dotted `resource.verb` action
  * constants (e.g. const RANK_UPDATED = 'rank.updated') and override
@@ -13,13 +13,13 @@ use Mxnwire\AuditLog\Contracts\ActivityTypeRegistryContract;
  * that vocabulary via reflection instead of `SELECT DISTINCT`-ing the
  * (potentially huge) activity_log table.
  *
- * Contrast with {@see ActivityTypeRegistry}, the default DB-backed registry the
+ * Contrast with {@see AuditTypeRegistry}, the default DB-backed registry the
  * service provider binds when the host app does not supply its own.
  *
  * Bind your subclass to the contract in a service provider:
- *   $this->app->bind(ActivityTypeRegistryContract::class, App\Activity\ActivityType::class);
+ *   $this->app->bind(AuditTypeRegistryContract::class, App\Audit\AuditType::class);
  */
-abstract class AbstractActivityTypeRegistry implements ActivityTypeRegistryContract
+abstract class AbstractAuditTypeRegistry implements AuditTypeRegistryContract
 {
     /**
      * Subject model FQCN each resource (`log_name`) is logged against. Override

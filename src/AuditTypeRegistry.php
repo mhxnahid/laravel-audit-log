@@ -2,10 +2,10 @@
 
 namespace Mxnwire\AuditLog;
 
-use Mxnwire\AuditLog\Contracts\ActivityTypeRegistryContract;
+use Mxnwire\AuditLog\Contracts\AuditTypeRegistryContract;
 use Spatie\Activitylog\Models\Activity;
 
-class ActivityTypeRegistry implements ActivityTypeRegistryContract
+class AuditTypeRegistry implements AuditTypeRegistryContract
 {
     public function logNames(): array
     {

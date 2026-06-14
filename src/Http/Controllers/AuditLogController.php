@@ -2,35 +2,35 @@
 
 namespace Mxnwire\AuditLog\Http\Controllers;
 
-use Mxnwire\AuditLog\Contracts\ActivityTypeRegistryContract;
+use Mxnwire\AuditLog\Contracts\AuditTypeRegistryContract;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Spatie\Activitylog\Models\Activity;
 
 /**
- * Admin viewer for the activity log.
+ * Admin viewer for the audit log.
  *
- * index() renders the Blade shell that mounts the <activity-logs> Vue component
+ * index() renders the Blade shell that mounts the <audit-logs> Vue component
  * and injects the filter option lists; data() is the JSON endpoint the component
  * paginates. Both are gated by the callable in config('audit-log.gate').
  */
-class ActivityLogController extends Controller
+class AuditLogController extends Controller
 {
     protected array $data = [];
 
-    private ActivityTypeRegistryContract $registry;
+    private AuditTypeRegistryContract $registry;
 
-    public function __construct(ActivityTypeRegistryContract $registry)
+    public function __construct(AuditTypeRegistryContract $registry)
     {
         $this->registry      = $registry;
-        $this->data['menu']  = 'activity-logs';
+        $this->data['menu']  = 'audit-logs';
     }
 
     public function index()
     {
         $this->data['filters'] = $this->filterOptions();
 
-        return view('audit-log::activity-log.index', $this->data);
+        return view('audit-log::audit-log.index', $this->data);
     }
 
     public function data(Request $request)
@@ -69,7 +69,36 @@ class ActivityLogController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        return response()->json($query->latest()->paginate(20));
+        $logs = $query->latest()->paginate(20);
+
+        $this->trimCausers($logs->getCollection());
+
+        return response()->json($logs);
+    }
+
+    /**
+     * Reduce each entry's eager-loaded causer to the attributes configured in
+     * `audit-log.causer_attributes`, so the JSON response carries only the keys
+     * the viewer needs instead of the full actor model. A null config value
+     * leaves the causer untouched. setVisible() whitelists the serialized keys
+     * while the model's own `$hidden` still applies, so listing a hidden column
+     * never exposes it.
+     *
+     * @param \Illuminate\Support\Collection<int, Activity> $logs
+     */
+    private function trimCausers($logs): void
+    {
+        $attributes = config('audit-log.causer_attributes');
+
+        if (! is_array($attributes)) {
+            return;
+        }
+
+        $logs->each(function (Activity $log) use ($attributes) {
+            if ($log->causer !== null) {
+                $log->causer->setVisible($attributes);
+            }
+        });
     }
 
     private function filterOptions(): array

@@ -2,7 +2,7 @@
 
 namespace Mxnwire\AuditLog\Tests\Unit;
 
-use Mxnwire\AuditLog\Activity\Metadata\Change;
+use Mxnwire\AuditLog\Audit\Metadata\Change;
 use PHPUnit\Framework\TestCase;
 
 class ChangeTest extends TestCase

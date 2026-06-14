@@ -142,11 +142,20 @@
                                         <div class="col-md-6">
                                             <h6 class="fw-bold mb-1">Request</h6>
                                             <ul class="list-unstyled small mb-0">
-                                                <li><span class="text-muted">Method:</span> @{{ req(record).method }}</li>
-                                                <li><span class="text-muted">Route:</span> @{{ req(record).route }}</li>
-                                                <li><span class="text-muted">URL:</span> @{{ req(record).url }}</li>
-                                                <li><span class="text-muted">IP:</span> @{{ req(record).ip }}</li>
-                                                <li><span class="text-muted">Agent:</span> @{{ req(record).user_agent }}</li>
+                                                <li v-for="entry in reqEntries(record)" v-bind:key="entry.key">
+                                                    <span class="text-muted">@{{ entry.label }}:</span> @{{ entry.value }}
+                                                </li>
+                                                <li v-if="reqHeaders(record).length" class="mt-1">
+                                                    <span class="text-muted fw-semibold">Headers</span>
+                                                    <ul class="list-unstyled ps-3 mb-0">
+                                                        <li v-for="h in reqHeaders(record)" v-bind:key="h.key">
+                                                            <span class="text-muted">@{{ h.label }}:</span> @{{ h.value }}
+                                                        </li>
+                                                    </ul>
+                                                </li>
+                                                <li v-if="!reqEntries(record).length && !reqHeaders(record).length" class="text-muted">
+                                                    No request context recorded.
+                                                </li>
                                             </ul>
                                         </div>
                                     </div>
@@ -154,7 +163,7 @@
                             </tr>
                         </template>
                         <tr v-if="!records.length">
-                            <td colspan="7" class="text-center text-muted py-4">No activity records found.</td>
+                            <td colspan="7" class="text-center text-muted py-4">No audit records found.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -218,8 +227,8 @@ Vue.component('audit-log', {
         },
     },
     mounted: function () {
-        if (window.activityLogFilters) {
-            this.filters = Object.assign({}, this.filters, window.activityLogFilters);
+        if (window.auditLogFilters) {
+            this.filters = Object.assign({}, this.filters, window.auditLogFilters);
         }
         var self = this;
         this.$nextTick(function () {
@@ -241,7 +250,7 @@ Vue.component('audit-log', {
         },
         fetchRecords: function (page) {
             this.loading = true;
-            var url = window.auditLogDataUrl || '/activity-logs/data';
+            var url = window.auditLogDataUrl || '/audit-logs/data';
             var params = Object.assign({}, this.search, { page: page || 1 });
             Object.keys(params).forEach(function (k) { if (!params[k]) delete params[k]; });
             var self = this;
@@ -263,6 +272,24 @@ Vue.component('audit-log', {
         properties: function (record) { return record.properties || {}; },
         actor: function (record) { return this.properties(record).__actor || { name: '--', role: '--' }; },
         req: function (record) { return this.properties(record).__request || {}; },
+        reqEntries: function (record) {
+            var req = this.req(record);
+            var self = this;
+            return Object.keys(req)
+                .filter(function (k) { return k !== 'headers'; })
+                .map(function (k) { return { key: k, label: self.labelize(k), value: self.display(req[k]) }; });
+        },
+        reqHeaders: function (record) {
+            var headers = this.req(record).headers || {};
+            var self = this;
+            return Object.keys(headers)
+                .map(function (k) { return { key: k, label: self.labelize(k), value: self.display(headers[k]) }; });
+        },
+        labelize: function (key) {
+            var overrides = { url: 'URL', ip: 'IP', user_agent: 'Agent', request_id: 'Request ID', correlation_id: 'Correlation ID' };
+            if (overrides[key]) { return overrides[key]; }
+            return String(key).replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+        },
         causerName: function (record) {
             var a = this.actor(record);
             return (a && a.name && a.name !== '--') ? a.name : (record.causer ? record.causer.name : '--');

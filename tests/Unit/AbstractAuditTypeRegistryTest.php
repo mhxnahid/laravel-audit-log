@@ -2,36 +2,36 @@
 
 namespace Mxnwire\AuditLog\Tests\Unit;
 
-use Mxnwire\AuditLog\AbstractActivityTypeRegistry;
+use Mxnwire\AuditLog\AbstractAuditTypeRegistry;
 use PHPUnit\Framework\TestCase;
 
-class AbstractActivityTypeRegistryTest extends TestCase
+class AbstractAuditTypeRegistryTest extends TestCase
 {
     public function test_all_returns_only_dotted_action_constants(): void
     {
         $this->assertSame(
             ['rank.created', 'rank.updated', 'user.created'],
-            FakeActivityTypeRegistry::all()
+            FakeAuditTypeRegistry::all()
         );
     }
 
     public function test_log_names_are_distinct_resources_sorted(): void
     {
-        $registry = new FakeActivityTypeRegistry();
+        $registry = new FakeAuditTypeRegistry();
 
         $this->assertSame(['rank', 'user'], $registry->logNames());
     }
 
     public function test_events_are_distinct_verbs_sorted(): void
     {
-        $registry = new FakeActivityTypeRegistry();
+        $registry = new FakeAuditTypeRegistry();
 
         $this->assertSame(['created', 'updated'], $registry->events());
     }
 
     public function test_subject_types_are_distinct_models_sorted(): void
     {
-        $registry = new FakeActivityTypeRegistry();
+        $registry = new FakeAuditTypeRegistry();
 
         $this->assertSame(
             ['App\\Models\\Rank', 'App\\Models\\User'],
@@ -40,7 +40,7 @@ class AbstractActivityTypeRegistryTest extends TestCase
     }
 }
 
-class FakeActivityTypeRegistry extends AbstractActivityTypeRegistry
+class FakeAuditTypeRegistry extends AbstractAuditTypeRegistry
 {
     const RANK_CREATED = 'rank.created';
     const RANK_UPDATED = 'rank.updated';

@@ -2,7 +2,7 @@
 
 namespace Mxnwire\AuditLog\Contracts;
 
-interface ActivityTypeRegistryContract
+interface AuditTypeRegistryContract
 {
     /** All distinct log_name values (resource names before the dot). */
     public function logNames(): array;

@@ -1,7 +1,7 @@
 {
     "name": "mxnwire/laravel-audit-log",
-    "description": "Activity log viewer layered on top of spatie/laravel-activitylog",
-    "version": "1.4.0",
+    "description": "Audit log viewer layered on top of spatie/laravel-activitylog",
+    "version": "2.0.0",
     "type": "library",
     "license": "MIT",
     "require": {

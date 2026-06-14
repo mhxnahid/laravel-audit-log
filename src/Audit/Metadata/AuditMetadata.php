@@ -1,17 +1,17 @@
 <?php
 
-namespace Mxnwire\AuditLog\Activity\Metadata;
+namespace Mxnwire\AuditLog\Audit\Metadata;
 
 /**
- * Typed metadata bag for an activity-log entry.
+ * Typed metadata bag for an audit-log entry.
  *
- *     ActivityMetadata::make(['level' => Change::make($old, $new)]);
- *     ActivityMetadata::make(['via' => 'password']);
- *     ActivityMetadata::diff($before, $after);
+ *     AuditMetadata::make(['level' => Change::make($old, $new)]);
+ *     AuditMetadata::make(['via' => 'password']);
+ *     AuditMetadata::diff($before, $after);
  *
  * {@see Change} values expand to `{old, new}` JSON; null fields are dropped.
  */
-final class ActivityMetadata
+final class AuditMetadata
 {
     /** @var array<string, mixed> */
     private $fields;

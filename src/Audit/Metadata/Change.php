@@ -1,11 +1,11 @@
 <?php
 
-namespace Mxnwire\AuditLog\Activity\Metadata;
+namespace Mxnwire\AuditLog\Audit\Metadata;
 
 /**
  * A single field's before/after pair.
  *
- * Serialized by {@see ActivityMetadata::toProperties()} into self-documenting JSON:
+ * Serialized by {@see AuditMetadata::toProperties()} into self-documenting JSON:
  *
  *     { "old": 2, "new": 5 }
  */
