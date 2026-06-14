@@ -72,6 +72,30 @@ return [
     // Receives the authenticated user (or null) and returns a string or null.
     'role_resolver' => fn ($user) => $user?->role ?? null,
 
+    // Class supplying the viewer's filter dropdown options (log names, events,
+    // subject types). Defaults to the DB-backed registry, which SELECT DISTINCTs
+    // the live activity_log table. Point this at an AbstractAuditTypeRegistry
+    // subclass to derive the options from a fixed vocabulary instead.
+    // See "Custom audit type registry" below.
+    'registry' => \Mxnwire\AuditLog\AuditTypeRegistry::class,
+
+    // Properties recorded under each entry's `__request` context.
+    // See "Configuring `__request`" below for the full reference.
+    'request_context' => [
+        'method', 'route', 'url', 'ip', 'user_agent', 'query',
+        // 'body',   // off by default — request input can carry secrets
+        'headers' => [
+            'request_id'     => 'X-Request-Id',
+            'correlation_id' => 'X-Correlation-Id',
+        ],
+    ],
+
+    // Field names stripped from logged `query`/`body` input before storage.
+    // Case-insensitive, recurses into nested arrays. See "Redacting secrets".
+    'redact' => [
+        'password', 'password_confirmation', 'token', 'secret', // …
+    ],
+
     // URL prefix for the viewer routes.
     // Changing this also renames the named routes `audit-log.index` and `audit-log.data`.
     'route_prefix' => 'mxn/audit-logs',
@@ -106,7 +130,7 @@ Use the global helper (available automatically — no import needed):
 audit_log('user.login');
 ```
 
-> **Renamed in 2.0.** The helper is now `audit_log()` and the service is `AuditLogService`. The old `activity_log()` helper is kept as a deprecated forwarding alias and will be removed in a future release — migrate calls to `audit_log()`.
+> **Renamed in 2.0.** The helper is now `audit_log()` and the service is `AuditLogService`. The old `activity_log()` helper has been removed — migrate any remaining calls to `audit_log()`.
 
 Or inject the service directly:
 
@@ -339,15 +363,39 @@ If your app does not use a `role` or `urole` attribute directly on the User mode
 
 ### Custom audit type registry
 
-The package resolves filter options (log names, events, subject types) from the `activity_log` table at runtime via `AuditTypeRegistry`. To provide a static list instead — or to customise the queries — bind your own implementation in a service provider:
+The viewer's filter dropdowns (log names, events, subject types) come from the class named in the `registry` config key. By default this is the DB-backed `AuditTypeRegistry`, which `SELECT DISTINCT`s the live `activity_log` table at runtime — zero setup, but it only ever surfaces values that have already been logged.
+
+To serve the options from a fixed vocabulary instead, extend `AbstractAuditTypeRegistry`, declare your dotted `resource.verb` actions as constants, and map each resource to its subject model:
+
+```php
+use Mxnwire\AuditLog\AbstractAuditTypeRegistry;
+
+class AuditType extends AbstractAuditTypeRegistry
+{
+    const RANK_UPDATED      = 'rank.updated';
+    const BROADSHEET_VIEWED = 'broadsheet.viewed';
+
+    protected const SUBJECT_MODELS = [
+        'rank' => \App\Models\Rank::class,
+    ];
+}
+```
+
+Then point the config at it:
+
+```php
+'registry' => \App\Audit\AuditType::class,
+```
+
+The option lists are derived from those constants via reflection, so new `RESOURCE_VERB` constants enrol automatically.
+
+For full control you can implement `AuditTypeRegistryContract` directly instead of extending the abstract class — it requires `logNames(): array`, `events(): array`, and `subjectTypes(): array`. The provider binds the contract with `bindIf`, so an explicit container binding in a service provider still takes precedence over the config value:
 
 ```php
 use Mxnwire\AuditLog\Contracts\AuditTypeRegistryContract;
 
 $this->app->bind(AuditTypeRegistryContract::class, MyCustomRegistry::class);
 ```
-
-Your class must implement `logNames(): array`, `events(): array`, and `subjectTypes(): array`.
 
 ---
 

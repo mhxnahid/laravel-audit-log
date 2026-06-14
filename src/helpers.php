@@ -18,20 +18,3 @@ if (! function_exists('audit_log')) {
         app(AuditLogService::class)->log($action, $subject, $metadata, $description);
     }
 }
-
-if (! function_exists('activity_log')) {
-    /**
-     * @deprecated 2.0.0 Use {@see audit_log()} instead. Kept as a thin forwarding
-     *             alias so existing callers keep working; will be removed in a
-     *             future release.
-     *
-     * @param string            $action
-     * @param Model|null        $subject
-     * @param AuditMetadata|null $metadata
-     * @param string|null       $description
-     */
-    function activity_log(string $action, $subject = null, ?AuditMetadata $metadata = null, ?string $description = null): void
-    {
-        audit_log($action, $subject, $metadata, $description);
-    }
-}
